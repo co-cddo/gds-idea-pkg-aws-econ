@@ -1,29 +1,3 @@
-import os
-
-
-def write_data(bucket, folder, filename, content, metadata=None):
-    metadata = {} if metadata is None else metadata
-
-    output_file_name = os.path.join(folder, filename)
-    print(f"Writing data to {bucket}/{output_file_name}")
-
-    # object = s3.Object(bucket, output_file_name)
-    # object.put(Body=content, Metadata=metadata)
-
-
-def read_data(bucket, folder, filename):
-    # input_object = s3.Object(bucket, os.path.join(folder, filename))
-    # body_bytes = input_object.get()["Body"].read()
-    # return body_bytes
-    return
-
-
-def save_response_content(bucket, folder, filename, content):
-    """directory_save_content saves content (of website) to s3"""
-
-    write_data(bucket, folder, filename, content)
-
-
 def _list_objects(s3_client, bucket, folder):
     if len(folder) != 0 and folder[-1] != "/":
         folder = folder + "/"
