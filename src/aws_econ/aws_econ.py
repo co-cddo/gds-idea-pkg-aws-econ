@@ -19,6 +19,13 @@ class AwsEcon:
     """AWS access for econ team.
 
     Provides methods for standard S3 and Athena operations and automatically manages dev and prod access.
+    Class sets up following attributes:
+    - dev_session - boto3 session for dev AWS account
+    - prod_session - boto3 session for prod AWS account
+    - s3_client_dev - boto3 S3 client for dev AWS account
+    - s3_client_prod - boto3 S3 client for prod AWS account
+    - athena_client_dev - boto3 Athena client for dev AWS account
+    - athena_client_prod - boto3 Athena client for prod AWS account
     """
 
     def __init__(self):
@@ -41,7 +48,16 @@ class AwsEcon:
         self.buckets_prod = wr.s3.list_buckets(boto3_session=self.prod_session)
 
     def list(self, folder: str = None, bucket: str = ECON_BUCKET_NAME) -> dict:
-        """List available buckets or files in dev or prod environments"""
+        """
+        List available folders or files in dev or prod environments
+
+        Args:
+            folder: folder to list data from
+            bucket: bucket to list data from
+
+        Returns:
+            Dictionary with folders and files available
+        """
 
         folder = "" if folder is None else folder
         client = self.s3_client_dev if bucket in self.buckets_dev else self.s3_client_prod
@@ -52,8 +68,19 @@ class AwsEcon:
 
         return return_dict
 
-    def read(self, file: str, bucket: str = ECON_BUCKET_NAME, buffer=False) -> pd.DataFrame | io.BytesIO:
-        """Read file from S3 bucket"""
+    def read(self, file: str, bucket: str = ECON_BUCKET_NAME, buffer=False) -> pd.DataFrame | io.BytesIO | bytes:
+        """
+        Read file from S3 bucket. CSV and PARQUET files are returnet as pandas dataframes,
+        remaining files as bytes or bytes stream.
+
+        Args:
+            file: file to read
+            bucket: bucket to read data from
+            buffer: whether to return data as buffer, only applicable if file is not csv or parquet
+
+        Returns:
+            pandas Dataframe, io Bytes stream or bytes
+        """
 
         session = self.dev_session if bucket in self.buckets_dev else self.prod_session
         file_type = file.rsplit(".", 1)[-1].lower()
@@ -72,7 +99,13 @@ class AwsEcon:
         return file
 
     def write(self, file: str, df: pd.DataFrame) -> None:
-        """Return the sum of a and b."""
+        """
+        Write file to S3 econ bucket
+
+        Args:
+            file: file to read
+            df: pandas dataframe
+        """
 
         session = self.dev_session
         file_type = file.rsplit(".", 1)[-1].lower()
@@ -90,20 +123,45 @@ class AwsEcon:
         local_file: str,
         bucket: str = ECON_BUCKET_NAME,
     ) -> None:
-        """Return the sum of a and b."""
+        """
+        Download file from S3 bucket to local space
+
+        Args:
+            file: file to read
+            local_file: local path to save file to
+            bucket: S3 bucket to read file from
+        """
 
         session = self.dev_session if bucket in self.buckets_dev else self.prod_session
 
         wr.s3.download(path=f"s3://{bucket}/{file}", local_file=local_file, boto3_session=session)
 
     def upload(self, file: str, local_file: str) -> None:
-        """Return the sum of a and b."""
+        """
+        Upload file from local space to S3 econ bucket
+
+        Args:
+            file: file to read
+            local_file: local path to save file to
+        """
 
         session = self.dev_session
 
         wr.s3.upload(path=f"s3://{ECON_BUCKET_NAME}/{file}", local_file=local_file, boto3_session=session)
 
-    def query(self, sql_query: str, database: str = "default", s3tables=False):
+    def query(self, sql_query: str, database: str = "default", s3tables=False) -> pd.DataFrame:
+        """
+        Execute SQL query and return data as dataframe
+
+        Args:
+            sql_query: SQL query to execute
+            database: databaase name to execute query on
+            s3tables: whether queried table is S3Table
+
+        Returns:
+            pandas Dataframe
+        """
+
         athena_client = self.athena_client_prod
 
         query_start_response = _start_query(
