@@ -6,7 +6,10 @@ authors = [
     { name = "Jarek-Rolski", email = "jaroslaw.rolski@yahoo.com" }
 ]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "awswrangler>=3.17.0",
+    "boto3>=1.43.40",
+]
 dynamic = ["version"]
 
 [build-system]

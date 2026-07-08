@@ -1,0 +1,192 @@
+"""Core calculator implementation."""
+
+import io
+import json
+import logging
+
+import awswrangler as wr
+import boto3
+import pandas as pd
+
+from aws_econ._athena_io_handler import _get_query_results, _has_query_succeeded, _start_query
+from aws_econ._config import ECON_BUCKET_NAME, PROD_ROLE_ARN_TO_ASSUME, S3_TABLES_CATALOGUE
+from aws_econ._s3_io_handler import _list_files, _list_folders, _list_objects
+
+logger = logging.getLogger(__name__)
+
+
+class AwsEcon:
+    """AWS access for econ team.
+
+    Provides methods for standard S3 and Athena operations and automatically manages dev and prod access.
+    Class sets up following attributes:
+    - dev_session - boto3 session for dev AWS account
+    - prod_session - boto3 session for prod AWS account
+    - s3_client_dev - boto3 S3 client for dev AWS account
+    - s3_client_prod - boto3 S3 client for prod AWS account
+    - athena_client_dev - boto3 Athena client for dev AWS account
+    - athena_client_prod - boto3 Athena client for prod AWS account
+    """
+
+    def __init__(self):
+        sts_client = boto3.client("sts")
+        profile_name = sts_client.get_caller_identity()["Arn"].split("/")[1]
+        assumed_role_object = sts_client.assume_role(RoleArn=PROD_ROLE_ARN_TO_ASSUME, RoleSessionName=profile_name)
+        credentials = assumed_role_object["Credentials"]
+        self.dev_session = boto3.session.Session()
+        self.prod_session = boto3.session.Session(
+            aws_access_key_id=credentials["AccessKeyId"],
+            aws_secret_access_key=credentials["SecretAccessKey"],
+            aws_session_token=credentials["SessionToken"],
+        )
+        self.s3_client_dev = self.dev_session.client("s3")
+        self.s3_client_prod = self.prod_session.client("s3")
+        self.athena_client_dev = self.dev_session.client("athena")
+        self.athena_client_prod = self.prod_session.client("athena")
+
+        self.buckets_dev = wr.s3.list_buckets(boto3_session=self.dev_session)
+        self.buckets_prod = wr.s3.list_buckets(boto3_session=self.prod_session)
+
+    def list(self, folder: str = None, bucket: str = ECON_BUCKET_NAME) -> dict:
+        """
+        List available folders or files in dev or prod environments
+
+        Args:
+            folder: folder to list data from
+            bucket: bucket to list data from
+
+        Returns:
+            Dictionary with folders and files available
+        """
+
+        folder = "" if folder is None else folder
+        client = self.s3_client_dev if bucket in self.buckets_dev else self.s3_client_prod
+        return_dict = {}
+        contents_prefixes, contents = _list_objects(client, bucket, folder)
+        return_dict["directories"] = _list_folders(folder, contents_prefixes)
+        return_dict["files"] = _list_files(folder, contents)
+
+        return return_dict
+
+    def read(self, file: str, bucket: str = ECON_BUCKET_NAME, buffer=False) -> pd.DataFrame | io.BytesIO | bytes:
+        """
+        Read file from S3 bucket. CSV and PARQUET files are returnet as pandas dataframes,
+        remaining files as bytes or bytes stream.
+
+        Args:
+            file: file to read
+            bucket: bucket to read data from
+            buffer: whether to return data as buffer, only applicable if file is not csv or parquet
+
+        Returns:
+            pandas Dataframe, io Bytes stream or bytes
+        """
+
+        session = self.dev_session if bucket in self.buckets_dev else self.prod_session
+        file_type = file.rsplit(".", 1)[-1].lower()
+
+        if file_type == "csv":
+            file = wr.s3.read_csv(f"s3://{bucket}/{file}", boto3_session=session)
+        elif file_type in ["parquet", "pq"]:
+            file = wr.s3.read_parquet(f"s3://{bucket}/{file}", boto3_session=session)
+        else:
+            with io.BytesIO() as data:
+                wr.s3.download(path=f"s3://{bucket}/{file}", local_file=data, boto3_session=session)
+                data.seek(0)
+                file = data.read()
+            file = io.BytesIO(file) if buffer else file
+
+        return file
+
+    def write(self, file: str, df: pd.DataFrame) -> None:
+        """
+        Write file to S3 econ bucket
+
+        Args:
+            file: file to read
+            df: pandas dataframe
+        """
+
+        session = self.dev_session
+        file_type = file.rsplit(".", 1)[-1].lower()
+
+        if file_type == "csv":
+            file = wr.s3.to_csv(df, f"s3://{ECON_BUCKET_NAME}/{file}", boto3_session=session)
+        elif file_type in ["parquet", "pq"]:
+            file = wr.s3.to_parquet(df, f"s3://{ECON_BUCKET_NAME}/{file}", boto3_session=session)
+        else:
+            raise ValueError("file extension is not supported")
+
+    def download(
+        self,
+        file: str,
+        local_file: str,
+        bucket: str = ECON_BUCKET_NAME,
+    ) -> None:
+        """
+        Download file from S3 bucket to local space
+
+        Args:
+            file: file to read
+            local_file: local path to save file to
+            bucket: S3 bucket to read file from
+        """
+
+        session = self.dev_session if bucket in self.buckets_dev else self.prod_session
+
+        wr.s3.download(path=f"s3://{bucket}/{file}", local_file=local_file, boto3_session=session)
+
+    def upload(self, file: str, local_file: str) -> None:
+        """
+        Upload file from local space to S3 econ bucket
+
+        Args:
+            file: file to read
+            local_file: local path to save file to
+        """
+
+        session = self.dev_session
+
+        wr.s3.upload(path=f"s3://{ECON_BUCKET_NAME}/{file}", local_file=local_file, boto3_session=session)
+
+    def query(self, sql_query: str, database: str = "default", s3tables=False) -> pd.DataFrame:
+        """
+        Execute SQL query and return data as dataframe
+
+        Args:
+            sql_query: SQL query to execute
+            database: databaase name to execute query on
+            s3tables: whether queried table is S3Table
+
+        Returns:
+            pandas Dataframe
+        """
+
+        athena_client = self.athena_client_prod
+
+        query_start_response = _start_query(
+            athena_client, sql_query, database, S3_TABLES_CATALOGUE if s3tables else None
+        )
+
+        try:
+            _has_query_succeeded(athena_client=athena_client, execution_id=query_start_response["QueryExecutionId"])
+        except Exception as e:
+            error_message = json.loads(str(e))
+            raise Exception(
+                json.dumps(
+                    {
+                        "QueryExecutionId": error_message["QueryExecution"]["QueryExecutionId"],
+                        "ErrorMessage": error_message["QueryExecution"]["Status"]["AthenaError"]["ErrorMessage"],
+                    },
+                    default=str,
+                )
+            ) from e
+
+        data = _get_query_results(
+            athena_client=athena_client,
+            execution_id=query_start_response["QueryExecutionId"],
+        )
+
+        df = pd.DataFrame(data=data[1:], columns=data[0])
+
+        return df
