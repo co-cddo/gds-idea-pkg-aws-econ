@@ -26,6 +26,8 @@ class AwsEcon:
     - s3_client_prod - boto3 S3 client for prod AWS account
     - athena_client_dev - boto3 Athena client for dev AWS account
     - athena_client_prod - boto3 Athena client for prod AWS account
+    - buckets_dev - S3 buckets in dev AWS account
+    - buckets_prod - S3 buckets in prod AWS account
     """
 
     def __init__(self):
@@ -111,9 +113,9 @@ class AwsEcon:
         file_type = file.rsplit(".", 1)[-1].lower()
 
         if file_type == "csv":
-            file = wr.s3.to_csv(df, f"s3://{ECON_BUCKET_NAME}/{file}", boto3_session=session)
+            file = wr.s3.to_csv(df, f"s3://{ECON_BUCKET_NAME}/{file}", boto3_session=session, index=False)
         elif file_type in ["parquet", "pq"]:
-            file = wr.s3.to_parquet(df, f"s3://{ECON_BUCKET_NAME}/{file}", boto3_session=session)
+            file = wr.s3.to_parquet(df, f"s3://{ECON_BUCKET_NAME}/{file}", boto3_session=session, index=False)
         else:
             raise ValueError("file extension is not supported")
 
