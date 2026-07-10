@@ -56,6 +56,7 @@ LICENCE = "sha256:21cc325b3181cb748845827425d37ce04b3dc563835bbf50fafbc56a5eb68c
 ".github/workflows/release.yml" = "sha256:d2c22e66042f7f7fca4dc1066ff3ffaa4303df9c8a57953684a0a927731b1fe6"
 [dependency-groups]
 dev = [
+    "moto[athena,s3,sts]>=5.2.2",
     "pre-commit>=4.6.0",
     "pytest>=9.0.0",
     "ruff>=0.14.0",
