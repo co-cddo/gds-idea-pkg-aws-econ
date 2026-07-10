@@ -8,7 +8,7 @@ from aws_econ import AwsEcon
 from aws_econ._config import ECON_BUCKET_NAME
 
 
-def test_s3_buckets_correct_account(create_mock_aws_s3_buckets):
+def test___init__(create_mock_aws_s3_buckets):
     aws = AwsEcon()
 
     assert aws.buckets_dev == [ECON_BUCKET_NAME, "dev"]
@@ -16,7 +16,7 @@ def test_s3_buckets_correct_account(create_mock_aws_s3_buckets):
     assert aws.buckets_prod == ["prod"]
 
 
-def test_s3_list_buckets_objects(create_mock_aws_s3_objects):
+def test_list(create_mock_aws_s3_objects):
     aws = AwsEcon()
 
     assert aws.list() == {"directories": ["csv"], "files": []}
@@ -26,7 +26,7 @@ def test_s3_list_buckets_objects(create_mock_aws_s3_objects):
     assert aws.list("", "prod") == {"directories": [], "files": ["json.json"]}
 
 
-def test_s3_read_buckets_objects(data_frame, create_mock_aws_s3_objects):
+def test_read(data_frame, create_mock_aws_s3_objects):
     aws = AwsEcon()
 
     df = data_frame
@@ -41,7 +41,7 @@ def test_s3_read_buckets_objects(data_frame, create_mock_aws_s3_objects):
     assert buffer.read() == aws.read("json.json", "prod")
 
 
-def test_s3_write_buckets_objects(data_frame, create_mock_aws_s3_objects):
+def test_write(data_frame, create_mock_aws_s3_objects):
     aws = AwsEcon()
 
     df = data_frame
@@ -53,7 +53,7 @@ def test_s3_write_buckets_objects(data_frame, create_mock_aws_s3_objects):
     )
 
 
-def test_s3_download_buckets_objects(tmp_path, create_mock_aws_s3_objects):
+def test_download(tmp_path, create_mock_aws_s3_objects):
     aws = AwsEcon()
 
     d = tmp_path / "sub"
@@ -65,7 +65,7 @@ def test_s3_download_buckets_objects(tmp_path, create_mock_aws_s3_objects):
     assert ["file.csv"] == os.listdir(d)
 
 
-def test_s3_upload_buckets_objects(tmp_path, create_mock_aws_s3_objects):
+def test_upload(tmp_path, create_mock_aws_s3_objects):
     aws = AwsEcon()
 
     d = tmp_path / "sub"
@@ -76,3 +76,10 @@ def test_s3_upload_buckets_objects(tmp_path, create_mock_aws_s3_objects):
     aws.upload("upload/json.json", str(p))
 
     assert [f"s3://{ECON_BUCKET_NAME}/upload/json.json"] == wr.s3.list_objects(f"s3://{ECON_BUCKET_NAME}/upload/")
+
+
+def test_query(mocked_aws):
+    aws = AwsEcon()
+
+    df = aws.query("SELECT * FROM table")
+    pd.testing.assert_frame_equal(df, pd.DataFrame(), check_dtype=False)

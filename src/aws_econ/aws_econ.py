@@ -189,6 +189,9 @@ class AwsEcon:
             execution_id=query_start_response["QueryExecutionId"],
         )
 
-        df = pd.DataFrame(data=data[1:], columns=data[0])
+        if len(data) > 0:
+            df = pd.DataFrame(data=data[1:], columns=data[0])
+        else:
+            df = pd.DataFrame()
 
         return df
