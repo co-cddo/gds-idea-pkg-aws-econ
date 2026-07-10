@@ -45,7 +45,6 @@ def _get_query_results(athena_client, execution_id):
     response = athena_client.get_query_results(
         QueryExecutionId=execution_id,
     )
-
     if "ResultSet" in response:
         data = response["ResultSet"]["Rows"]
     while response.get("NextToken") is not None:
