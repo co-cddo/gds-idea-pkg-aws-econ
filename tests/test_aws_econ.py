@@ -78,6 +78,34 @@ def test_upload(tmp_path, create_mock_aws_s3_objects):
     assert [f"s3://{ECON_BUCKET_NAME}/upload/json.json"] == wr.s3.list_objects(f"s3://{ECON_BUCKET_NAME}/upload/")
 
 
+def test_delete(create_mock_aws_s3_objects):
+    aws = AwsEcon()
+
+    aws.delete("csv/")
+
+    assert 1 == len(wr.s3.list_objects(f"s3://{ECON_BUCKET_NAME}/csv/"))
+
+    aws.delete("csv/csv.csv")
+
+    assert 0 == len(wr.s3.list_objects(f"s3://{ECON_BUCKET_NAME}/csv/"))
+
+
+def test_rename(create_mock_aws_s3_objects):
+    aws = AwsEcon()
+
+    aws.rename("csv/csv.csv", "copy/keep.csv", keep_current=True)
+
+    assert [f"s3://{ECON_BUCKET_NAME}/csv/csv.csv"] == wr.s3.list_objects(f"s3://{ECON_BUCKET_NAME}/csv/")
+    assert [f"s3://{ECON_BUCKET_NAME}/copy/keep.csv"] == wr.s3.list_objects(f"s3://{ECON_BUCKET_NAME}/copy/")
+
+    aws.rename("csv/csv.csv", "copy/keep_second.csv")
+
+    assert [
+        f"s3://{ECON_BUCKET_NAME}/copy/keep.csv",
+        f"s3://{ECON_BUCKET_NAME}/copy/keep_second.csv",
+    ] == wr.s3.list_objects(f"s3://{ECON_BUCKET_NAME}/copy/")
+
+
 def test_query(mocked_aws):
     aws = AwsEcon()
 

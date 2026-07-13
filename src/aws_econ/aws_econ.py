@@ -19,6 +19,7 @@ class AwsEcon:
     """AWS access for econ team.
 
     Provides methods for standard S3 and Athena operations and automatically manages dev and prod access.
+
     Class sets up following attributes:
     - dev_session - boto3 session for dev AWS account
     - prod_session - boto3 session for prod AWS account
@@ -28,6 +29,35 @@ class AwsEcon:
     - athena_client_prod - boto3 Athena client for prod AWS account
     - buckets_dev - S3 buckets in dev AWS account
     - buckets_prod - S3 buckets in prod AWS account
+
+    Class sets up following functions:
+    - list - list bucket and folder objects
+    - read - read file from S3 and return as DataFrame if possible
+    - write - write dataframe to S3 econ bucket
+    - download - download S3 file to local space
+    - upload - upload local file to S3 econ bucket
+    - delete - delete file from S3 econ bucket
+    - rename - rename file in S3 econ bucket
+    - query - query Athena tables
+
+    Examples
+    --------
+    Initialize object.
+
+    >>> from aws_econ import aws_econ
+    >>> aws = AwsEcon()
+
+    List files and directories in a bucket.
+
+    >>> result = aws.list("data", "bucket")
+    >>> result
+    {"directories": [], "files": ["csv.csv"]}
+
+    Notice that both arguments folder and bucket are optional.
+    If folder is not given, top bucket folder will be listed.
+    If bucket is not given, default econ bucket will be listed.
+
+
     """
 
     def __init__(self):
@@ -150,6 +180,44 @@ class AwsEcon:
         session = self.dev_session
 
         wr.s3.upload(path=f"s3://{ECON_BUCKET_NAME}/{file}", local_file=local_file, boto3_session=session)
+
+    def delete(self, file: str) -> None:
+        """
+        Delete file from S3 econ bucket
+
+        Args:
+            file: file to delete
+        """
+
+        session = self.dev_session
+
+        wr.s3.delete_objects([f"s3://{ECON_BUCKET_NAME}/{file}"], boto3_session=session)
+
+    def rename(self, file_source: str, file_target: str, keep_current: bool = None):
+        """
+        Rename or relocate file in S3 econ bucket
+
+        Args:
+            file_source: current file name and location
+            file_target: new file name and location
+            keep_current: keep current file after renaming
+        """
+        keep_current = False if keep_current is None else keep_current
+
+        session = self.dev_session
+
+        current_file_path, current_file_name = file_source.rsplit("/", 1)
+        new_file_path, new_file_name = file_target.rsplit("/", 1)
+        wr.s3.copy_objects(
+            paths=[f"s3://{ECON_BUCKET_NAME}/{file_source}"],
+            source_path=f"s3://{ECON_BUCKET_NAME}/{current_file_path}",
+            target_path=f"s3://{ECON_BUCKET_NAME}/{new_file_path}",
+            replace_filenames={current_file_name: new_file_name},
+            boto3_session=session,
+        )
+
+        if not keep_current:
+            self.delete(file_source)
 
     def query(self, sql_query: str, database: str = "default", s3tables=False) -> pd.DataFrame:
         """
