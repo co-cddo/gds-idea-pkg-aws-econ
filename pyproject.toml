@@ -1,6 +1,6 @@
 [project]
 name = "gds-idea-pkg-aws-econ"
-description = "TODO: add description"
+description = "The package simplifies access to S3 and Athena for GDS IDEA team."
 readme = "README.md"
 authors = [
     { name = "Jarek-Rolski", email = "jaroslaw.rolski@yahoo.com" }

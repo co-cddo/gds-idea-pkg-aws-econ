@@ -1,6 +1,108 @@
 # gds-idea-pkg-aws-econ
 
-_Brief description of your package._
+The package simplifies access to S3 and Athena for GDS IDEA team.
+
+## How to use
+
+Provides methods for standard S3 and Athena operations and automatically manages dev and prod access.
+
+Class sets up following attributes:
+- dev_session - boto3 session for dev AWS account
+- prod_session - boto3 session for prod AWS account
+- s3_client_dev - boto3 S3 client for dev AWS account
+- s3_client_prod - boto3 S3 client for prod AWS account
+- athena_client_dev - boto3 Athena client for dev AWS account
+- athena_client_prod - boto3 Athena client for prod AWS account
+- buckets_dev - S3 buckets in dev AWS account
+- buckets_prod - S3 buckets in prod AWS account
+
+Class sets up following functions:
+- list - list bucket and folder objects
+- read - read file from S3 and return as DataFrame if possible
+- write - write dataframe to S3 econ bucket
+- download - download S3 file to local space
+- upload - upload local file to S3 econ bucket
+- delete - delete file from S3 econ bucket
+- rename - rename file in S3 econ bucket
+- query - query Athena tables
+
+Examples
+--------
+Initialize object.
+
+>>> from aws_econ import aws_econ \
+>>> aws = AwsEcon()
+
+
+List files and directories in a bucket.
+
+>>> result = aws.list("data", "bucket") \
+>>> result \
+{"directories": [], "files": ["csv.csv"]}
+
+Notice that both arguments folder and bucket are optional.
+If folder is not given, top bucket folder will be listed.
+If bucket is not given, default econ bucket will be listed.
+
+
+Read file from S3.
+>>> df = aws.read("project1/data.csv", "bucket") \
+>>> df \
+&ensp; 0   1 \
+0   3   4 \
+1   5   6
+
+Notice that second argument bucket is optional.
+If bucket is not given, default econ bucket will be used.
+If possible data you read will be returned as DataFrame.
+
+
+Write file to S3.
+>>> df = pd.DataFrame([[1,2],[3,4]]) \
+>>> df = aws.write("save/data.parquet", df)
+
+Notice that function can only saves DataFrames to econ bucket.
+
+
+Download file from S3 to local space.
+>>> aws.download("project1/data.csv", "./data.csv", "bucket")
+
+Notice that first argument is source location in S3,
+second argument target in local space,
+third argument bucket is optional.
+If bucket is not given, default econ bucket will be used.
+
+
+Upload file to S3 econ bucket from local space.
+>>> aws.upload("project1/data.csv", "./data1.csv")
+
+Notice that first argument is target location in S3,
+second argument is source in local space.
+
+
+Delete file from S3 econ bucket.
+>>> aws.delete("project1/data.csv")
+
+
+Rename or relocate file in S3 econ bucket.
+>>> aws.rename("project1/data.csv", "archive/project1/old_data.csv", keep_current=True)
+
+Notice that first argument is source location in S3,
+second argument is target in S3.
+third argument keep_current is optional, default value False will delete source file.
+
+
+Query data from Athena.
+>>> df = aws.query("SELECT * FROM table", database="database_project1", s3tables=True) \
+>>> df \
+&ensp; 0   1 \
+0   3   4 \
+1   5   6
+
+Notice that first argument is SQL query,
+second argument database is optional, deafult value is default.
+third argument s3tables is optional, default value False will read data from S3 data catalogue,
+True will read data from S3Tables data catalogue.
 
 ## Prerequisites
 

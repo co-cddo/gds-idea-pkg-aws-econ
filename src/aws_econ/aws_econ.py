@@ -19,6 +19,7 @@ class AwsEcon:
     """AWS access for econ team.
 
     Provides methods for standard S3 and Athena operations and automatically manages dev and prod access.
+
     Class sets up following attributes:
     - dev_session - boto3 session for dev AWS account
     - prod_session - boto3 session for prod AWS account
@@ -28,6 +29,95 @@ class AwsEcon:
     - athena_client_prod - boto3 Athena client for prod AWS account
     - buckets_dev - S3 buckets in dev AWS account
     - buckets_prod - S3 buckets in prod AWS account
+
+    Class sets up following functions:
+    - list - list bucket and folder objects
+    - read - read file from S3 and return as DataFrame if possible
+    - write - write dataframe to S3 econ bucket
+    - download - download S3 file to local space
+    - upload - upload local file to S3 econ bucket
+    - delete - delete file from S3 econ bucket
+    - rename - rename file in S3 econ bucket
+    - query - query Athena tables
+
+    Examples
+    --------
+    Initialize object.
+
+    >>> from aws_econ import aws_econ
+    >>> aws = AwsEcon()
+
+
+    List files and directories in a bucket.
+
+    >>> result = aws.list("data", "bucket")
+    >>> result
+    {"directories": [], "files": ["csv.csv"]}
+
+    Notice that both arguments folder and bucket are optional.
+    If folder is not given, top bucket folder will be listed.
+    If bucket is not given, default econ bucket will be listed.
+
+
+    Read file from S3.
+    >>> df = aws.read("project1/data.csv", "bucket")
+    >>> df
+        0   1
+    0   3   4
+    1   5   6
+
+    Notice that second argument bucket is optional.
+    If bucket is not given, default econ bucket will be used.
+    If possible data you read will be returned as DataFrame.
+
+
+    Write file to S3.
+    >>> df = pd.DataFrame([[1,2],[3,4]])
+    >>> df = aws.write("save/data.parquet", df)
+
+    Notice that function can only saves DataFrames to econ bucket.
+
+
+    Download file from S3 to local space.
+    >>> aws.download("project1/data.csv", "./data.csv", "bucket")
+
+    Notice that first argument is source location in S3,
+    second argument target in local space,
+    third argument bucket is optional.
+    If bucket is not given, default econ bucket will be used.
+
+
+    Upload file to S3 econ bucket from local space.
+    >>> aws.upload("project1/data.csv", "./data1.csv")
+
+    Notice that first argument is target location in S3,
+    second argument is source in local space.
+
+
+    Delete file from S3 econ bucket.
+    >>> aws.delete("project1/data.csv")
+
+
+    Rename or relocate file in S3 econ bucket.
+    >>> aws.rename("project1/data.csv", "archive/project1/old_data.csv", keep_current=True)
+
+    Notice that first argument is source location in S3,
+    second argument is target in S3.
+    third argument keep_current is optional, default value False will delete source file.
+
+
+    Query data from Athena.
+    >>> df = aws.query("SELECT * FROM table", database="database_project1", s3tables=True)
+    >>> df
+        0   1
+    0   3   4
+    1   5   6
+
+    Notice that first argument is SQL query,
+    second argument database is optional, deafult value is default.
+    third argument s3tables is optional, default value False will read data from S3 data catalogue,
+    True will read data from S3Tables data catalogue.
+
     """
 
     def __init__(self):
@@ -150,6 +240,44 @@ class AwsEcon:
         session = self.dev_session
 
         wr.s3.upload(path=f"s3://{ECON_BUCKET_NAME}/{file}", local_file=local_file, boto3_session=session)
+
+    def delete(self, file: str) -> None:
+        """
+        Delete file from S3 econ bucket
+
+        Args:
+            file: file to delete
+        """
+
+        session = self.dev_session
+
+        wr.s3.delete_objects([f"s3://{ECON_BUCKET_NAME}/{file}"], boto3_session=session)
+
+    def rename(self, file_source: str, file_target: str, keep_current: bool = None):
+        """
+        Rename or relocate file in S3 econ bucket
+
+        Args:
+            file_source: current file name and location
+            file_target: new file name and location
+            keep_current: keep current file after renaming
+        """
+        keep_current = False if keep_current is None else keep_current
+
+        session = self.dev_session
+
+        current_file_path, current_file_name = file_source.rsplit("/", 1)
+        new_file_path, new_file_name = file_target.rsplit("/", 1)
+        wr.s3.copy_objects(
+            paths=[f"s3://{ECON_BUCKET_NAME}/{file_source}"],
+            source_path=f"s3://{ECON_BUCKET_NAME}/{current_file_path}",
+            target_path=f"s3://{ECON_BUCKET_NAME}/{new_file_path}",
+            replace_filenames={current_file_name: new_file_name},
+            boto3_session=session,
+        )
+
+        if not keep_current:
+            self.delete(file_source)
 
     def query(self, sql_query: str, database: str = "default", s3tables=False) -> pd.DataFrame:
         """
