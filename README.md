@@ -2,6 +2,39 @@
 
 The package simplifies access to S3 and Athena for GDS IDEA team.
 
+## How to install (via terminal)
+
+### Install idea-tools
+
+[idea-tools website](https://co-cddo.github.io/gds-idea-pypi/)
+
+### Install and configure awsprofile
+
+```
+idea-tools install gds-idea-pkg-awsprofile
+awsprofile init —email {your-aws-account-email} —access-key {access key from credentials file} —secret-key {secret key from credentials file}
+awsprofile set  assume-ds-role-dev-poweraccess devp
+awsprofile set  assume-ds-role-dev-readonly dev
+```
+
+### Set up credentials (valid for 8 hours) to access AWS
+
+```
+awsprofile dev {MFA-code}
+```
+
+### Install aws_econ
+
+```
+idea-tools install gds-idea-pkg-aws-econ
+```
+
+### Upgrade aws_econ to newer version
+
+```
+idea-tools upgrade gds-idea-pkg-aws-econ
+```
+
 ## How to use
 
 Provides methods for standard S3 and Athena operations and automatically manages dev and prod access.
