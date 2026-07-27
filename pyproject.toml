@@ -8,7 +8,7 @@ authors = [
 requires-python = ">=3.11"
 dependencies = [
     "awswrangler>=3.17.0",
-    "boto3>=1.43.40",
+    "boto3>=1.43.56",
 ]
 dynamic = ["version"]
 
@@ -57,7 +57,7 @@ LICENCE = "sha256:21cc325b3181cb748845827425d37ce04b3dc563835bbf50fafbc56a5eb68c
 [dependency-groups]
 dev = [
     "moto[athena,s3,sts]>=5.2.2",
-    "pre-commit>=4.6.0",
+    "pre-commit>=4.6.1",
     "pytest>=9.0.0",
-    "ruff>=0.14.0",
+    "ruff>=0.16.0",
 ]
